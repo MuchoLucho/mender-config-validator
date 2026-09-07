@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mender Config Validator</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #8b93a3;
+    --accent: #4da6ff;
+    --ok: #3ecf8e;
+    --warn: #f2b84b;
+    --err: #f2555a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .tabs button {
+    background: none; border: none; color: var(--muted); padding: 10px 16px; cursor: pointer;
+    font-size: 13px; border-bottom: 2px solid transparent;
+  }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  .file-note { padding: 8px 24px; font-size: 12px; color: var(--muted); background: var(--panel); border-bottom: 1px solid var(--border); }
+  .file-note code { color: var(--accent); }
+  .toolbar { display: flex; gap: 8px; padding: 12px 24px; align-items: center; flex-wrap: wrap; }
+  .toolbar button {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .toolbar button:hover { border-color: var(--accent); }
+  .status { margin-left: auto; font-size: 13px; padding: 4px 10px; border-radius: 12px; }
+  .status.ok { background: rgba(62,207,142,0.15); color: var(--ok); }
+  .status.bad { background: rgba(242,85,90,0.15); color: var(--err); }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; align-items: start; }
+  textarea {
+    width: 100%; height: 70vh; background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.5; resize: vertical; tab-size: 2;
+  }
+  textarea.invalid { border-color: var(--err); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; max-height: 34vh; overflow: auto; }
+  .panel h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .row { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .row:last-child { border-bottom: none; }
+  .row .path { color: var(--accent); font-family: ui-monospace, monospace; }
+  .row .msg { color: var(--text); }
+  .row.err .path::before { content: "✕ "; color: var(--err); }
+  .row.warn .path::before { content: "! "; color: var(--warn); }
+  .row .default { color: var(--muted); font-size: 12px; }
+  .row button.insert { float: right; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  .row button.insert:hover { color: var(--accent); border-color: var(--accent); }
+  .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
+  .search { width: 100%; padding: 6px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); margin-bottom: 8px; font-size: 13px; }
+  .badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; }
+  .badge.mandatory { background: rgba(242,85,90,0.15); color: var(--err); }
+  .badge.deprecated { background: rgba(242,184,75,0.15); color: var(--warn); }
+  .badge.set { background: rgba(62,207,142,0.15); color: var(--ok); }
+  .type { color: var(--muted); font-size: 11px; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Mender Config Validator</h1>
+    <p>Edit, validate and download <code>mender.conf</code> / <code>mender-connect.conf</code></p>
+  </header>
+
+  <div class="tabs">
+    <button :class="{active: activeFile==='mender'}" @click="activeFile='mender'">mender.conf</button>
+    <button :class="{active: activeFile==='connect'}" @click="activeFile='connect'">mender-connect.conf</button>
+  </div>
+
+  <div class="file-note" v-if="activeFile==='mender'">
+    Loaded from <code>/var/lib/mender/mender.conf</code> first, then <code>/etc/mender/mender.conf</code> (later file wins on conflicting keys).
+  </div>
+  <div class="file-note" v-else>
+    Loaded from <code>/etc/mender/mender-connect.conf</code> (falls back to <code>/var/lib/mender/mender-connect.conf</code>).
+  </div>
+
+  <div class="toolbar">
+    <button @click="$refs.fileInput.click()">Upload file</button>
+    <input type="file" ref="fileInput" accept=".conf,.json,text/plain,application/json" @change="onUpload">
+    <button @click="download">Download {{ activeFile==='mender' ? 'mender.conf' : 'mender-connect.conf' }}</button>
+    <button @click="resetCurrent">Reset to minimal example</button>
+    <span class="status" :class="validation.isValid ? 'ok' : 'bad'">
+      {{ validation.isValid ? '✓ Valid' : validation.errors.length + ' error(s), ' + validation.warnings.length + ' warning(s)' }}
+    </span>
+  </div>
+
+  <main>
+    <div>
+      <textarea v-model="currentText" spellcheck="false" :class="{invalid: !validation.isValidJson}"></textarea>
+    </div>
+
+    <div>
+      <div class="panel" v-if="!validation.isValidJson">
+        <h2>JSON syntax error</h2>
+        <div class="row err">
+          <div class="msg">{{ validation.parseError }}</div>
+        </div>
+      </div>
+
+      <template v-else>
+        <div class="panel" v-if="validation.errors.length">
+          <h2>Errors ({{ validation.errors.length }})</h2>
+          <div class="row err" v-for="e in validation.errors" :key="e.path + e.message">
+            <span class="path">{{ e.path }}</span> — <span class="msg">{{ e.message }}</span>
+          </div>
+        </div>
+
+        <div class="panel" v-if="validation.warnings.length">
+          <h2>Warnings ({{ validation.warnings.length }})</h2>
+          <div class="row warn" v-for="w in validation.warnings" :key="w.path + w.message">
+            <span class="path">{{ w.path }}</span> — <span class="msg">{{ w.message }}</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Not set — defaults that apply</h2>
+          <div class="empty" v-if="!validation.missingWithDefault.length">Every key with a default is explicitly set.</div>
+          <div class="row" v-for="f in validation.missingWithDefault" :key="f.pathStr">
+            <button class="insert" @click="insertField(f)">insert</button>
+            <span class="path">{{ f.pathStr }}</span>
+            <span class="default">= {{ formatDefault(f) }}</span>
+          </div>
+        </div>
+      </template>
+
+      <div class="panel">
+        <h2>Available keys</h2>
+        <input class="search" v-model="browseSearch" placeholder="Filter keys…">
+        <div v-for="f in filteredFields" :key="f.pathStr" class="row">
+          <button class="insert" @click="insertField(f)">insert</button>
+          <span class="path">{{ f.pathStr }}</span>
+          <span class="type">{{ f.type }}</span>
+          <span class="badge mandatory" v-if="f.mandatoryGroup">required</span>
+          <span class="badge deprecated" v-if="f.deprecated">deprecated</span>
+          <span class="badge set" v-if="isPresent(f)">set</span>
+          <div class="msg" style="color:var(--muted); font-size:12px; margin-top:2px;">{{ f.description }}</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+// ---- schema -----------------------------------------------------------
+// path: array of nested JSON keys. type: string|integer|boolean|string[]|serverArray|any
+// format: url|path|device-path|pkcs11|path-or-pkcs11|enum|octal|range
+const FIELDS = [
+  // mender.conf
+  { file:'mender', path:['ServerURL'], type:'string', format:'url', mandatoryGroup:'server',
+    description:'Base URL of the Mender server device API endpoint.' },
+  { file:'mender', path:['Servers'], type:'serverArray', mandatoryGroup:'server',
+    description:'List of {"ServerURL": "..."} objects, alternative to ServerURL for failover.' },
+  { file:'mender', path:['ServerCertificate'], type:'string', format:'path',
+    description:'Absolute path to a trusted server certificate (PEM) used to verify the server.' },
+  { file:'mender', path:['TenantToken'], type:'string',
+    description:'Mender Enterprise/Hosted tenant token, required for hosted Mender.' },
+
+  { file:'mender', path:['UpdatePollIntervalSeconds'], type:'integer', default:1800,
+    description:'How often the client checks for a new deployment.' },
+  { file:'mender', path:['InventoryPollIntervalSeconds'], type:'integer', default:28800,
+    description:'How often the client submits inventory data to the server.' },
+  { file:'mender', path:['RetryPollIntervalSeconds'], type:'integer', default:300,
+    description:'Wait time before retrying a failed server request (minimum recommended: 60).' },
+  { file:'mender', path:['RetryPollCount'], type:'integer',
+    description:'Number of retry attempts. If unset, computed automatically from RetryPollIntervalSeconds.' },
+
+  { file:'mender', path:['UpdateControlMapExpirationTimeSeconds'], type:'integer', deprecated:true,
+    description:'Deprecated/unsupported since Client v4.0. Default: 2 × UpdatePollIntervalSeconds.' },
+  { file:'mender', path:['UpdateControlMapBootExpirationTimeSeconds'], type:'integer', default:600, deprecated:true,
+    description:'Deprecated/unsupported since Client v4.0.' },
+  { file:'mender', path:['UpdateControlMapPollIntervalSeconds'], type:'integer', deprecated:true,
+    description:'Deprecated/unsupported since Client v4.0. Default: same as UpdatePollIntervalSeconds.' },
+
+  { file:'mender', path:['ArtifactVerifyKey'], type:'string', format:'path', exclusiveGroup:'artifactVerify',
+    description:'Absolute path to a single public key used to verify Artifact signatures.' },
+  { file:'mender', path:['ArtifactVerifyKeys'], type:'string[]', exclusiveGroup:'artifactVerify',
+    description:'List of absolute paths to public keys, any of which can verify an Artifact.' },
+  { file:'mender', path:['RootfsPartA'], type:'string', format:'device-path',
+    description:'Device path of rootfs partition A (e.g. /dev/hda2).' },
+  { file:'mender', path:['RootfsPartB'], type:'string', format:'device-path',
+    description:'Device path of rootfs partition B (e.g. /dev/hda3).' },
+  { file:'mender', path:['DeviceTypeFile'], type:'string', format:'path', default:'/var/lib/mender/device_type',
+    description:'Path to the file holding this device\'s device type identifier.' },
+  { file:'mender', path:['UpdateLogPath'], type:'string', format:'path',
+    description:'Absolute path where update module execution logs are stored.' },
+  { file:'mender', path:['BootUtilitiesGetNextActivePart'], type:'string', deprecated:true,
+    description:'Deprecated since Client v4.0.' },
+  { file:'mender', path:['BootUtilitiesSetActivePart'], type:'string', deprecated:true,
+    description:'Deprecated since Client v4.0.' },
+
+  { file:'mender', path:['HttpsClient','Certificate'], type:'string', format:'path',
+    description:'Absolute path to client certificate (PEM) for mutual TLS with the server.' },
+  { file:'mender', path:['HttpsClient','Key'], type:'string', format:'path-or-pkcs11',
+    description:'Absolute path or PKCS#11 URI to the client TLS private key.' },
+  { file:'mender', path:['HttpsClient','SSLEngine'], type:'string', deprecated:true,
+    description:'OpenSSL engine id. Deprecated on OpenSSL 3.0+ (use PKCS#11 URIs instead).' },
+
+  { file:'mender', path:['Security','AuthPrivateKey'], type:'string', format:'path-or-pkcs11',
+    description:'Absolute path or PKCS#11 URI to the device identity private key.' },
+  { file:'mender', path:['Security','SSLEngine'], type:'string', deprecated:true,
+    description:'OpenSSL engine id. Deprecated on OpenSSL 3.0+ (use PKCS#11 URIs instead).' },
+
+  { file:'mender', path:['Connectivity','DeviceTier'], type:'string', format:'enum', enum:['standard','system','micro'], default:'standard',
+    description:'Device performance tier, affects connection handling strategy.' },
+  { file:'mender', path:['Connectivity','DisableKeepAlive'], type:'boolean', default:false, deprecated:true,
+    description:'Deprecated/unsupported since Client v4.0.' },
+  { file:'mender', path:['Connectivity','IdleConnTimeoutSeconds'], type:'integer', default:30, deprecated:true,
+    description:'Deprecated/unsupported since Client v4.0.' },
+
+  { file:'mender', path:['StateScriptTimeoutSeconds'], type:'integer', default:3600,
+    description:'Max time a single state script is allowed to run.' },
+  { file:'mender', path:['StateScriptRetryTimeoutSeconds'], type:'integer', default:1800,
+    description:'Max total time spent retrying a failing state script.' },
+  { file:'mender', path:['StateScriptRetryIntervalSeconds'], type:'integer', default:60,
+    description:'Wait time between state script retries.' },
+
+  { file:'mender', path:['ModuleTimeoutSeconds'], type:'integer', default:14400,
+    description:'Max time an update module is allowed to run.' },
+  { file:'mender', path:['RetryDownloadCount'], type:'integer', format:'range', min:1, max:10000, default:10,
+    description:'Number of times to retry a failed Artifact download.' },
+
+  { file:'mender', path:['DaemonLogLevel'], type:'string', format:'enum', enum:['debug','info','warning','error'],
+    description:'Log level for the mender daemon. Overridden by the --log-level CLI flag.' },
+
+  // mender-connect.conf
+  { file:'connect', path:['ReconnectIntervalSeconds'], type:'integer', default:5,
+    description:'Wait time before reconnecting to the server after a lost connection.' },
+  { file:'connect', path:['ShellCommand'], type:'string', format:'path', default:'/bin/sh',
+    description:'Absolute path to the shell binary used for remote terminal sessions (must be listed in /etc/shells).' },
+  { file:'connect', path:['ShellArguments'], type:'string[]', default:['--login'],
+    description:'Arguments passed to ShellCommand when starting a session.' },
+  { file:'connect', path:['User'], type:'string', default:'',
+    description:'System user the remote shell session runs as.' },
+
+  { file:'connect', path:['Terminal','Disable'], type:'boolean', default:false, description:'Disable the remote terminal feature.' },
+  { file:'connect', path:['Terminal','Height'], type:'integer', default:40, description:'Default terminal height in rows.' },
+  { file:'connect', path:['Terminal','Width'], type:'integer', default:80, description:'Default terminal width in columns.' },
+
+  { file:'connect', path:['Sessions','MaxPerUser'], type:'integer', default:1, description:'Max concurrent sessions per user.' },
+  { file:'connect', path:['Sessions','StopExpired'], type:'boolean', default:false, description:'Stop sessions once expired.' },
+  { file:'connect', path:['Sessions','ExpireAfter'], type:'integer', default:0, exclusiveGroup:'sessionExpire',
+    description:'Seconds after session start until it expires (0 = never). Mutually exclusive with ExpireAfterIdle.' },
+  { file:'connect', path:['Sessions','ExpireAfterIdle'], type:'integer', default:0, exclusiveGroup:'sessionExpire',
+    description:'Seconds of inactivity until a session expires (0 = never). Mutually exclusive with ExpireAfter.' },
+
+  { file:'connect', path:['FileTransfer','Disable'], type:'boolean', default:false, description:'Disable the file transfer feature.' },
+  { file:'connect', path:['PortForward','Disable'], type:'boolean', default:false, description:'Disable the port forwarding feature.' },
+  { file:'connect', path:['MenderClient','Disable'], type:'boolean', default:false, description:'Disable the local mender-client control feature.' },
+
+  { file:'connect', path:['Limits','Enabled'], type:'boolean', default:true, description:'Enable enforcement of the Limits.* settings.' },
+  { file:'connect', path:['Limits','FileTransfer','Chroot'], type:'string', format:'path', default:'/var/lib/mender/filetransfer',
+    description:'Root directory file transfers are confined to.' },
+  { file:'connect', path:['Limits','FileTransfer','OwnerGet'], type:'string[]', default:['mender','root'],
+    description:'Usernames allowed to download files (empty = all allowed).' },
+  { file:'connect', path:['Limits','FileTransfer','GroupGet'], type:'string[]', default:['games','users'],
+    description:'Group names allowed to download files (empty = all allowed).' },
+  { file:'connect', path:['Limits','FileTransfer','OwnerPut'], type:'string', default:'root',
+    description:'Username assigned as owner of uploaded files.' },
+  { file:'connect', path:['Limits','FileTransfer','GroupPut'], type:'string', default:'mender',
+    description:'Group name assigned to uploaded files.' },
+  { file:'connect', path:['Limits','FileTransfer','MaxFileSize'], type:'integer', default:4,
+    description:'Max file size in MB for transfers (0 = unlimited).' },
+  { file:'connect', path:['Limits','FileTransfer','FollowSymLinks'], type:'boolean', default:true, description:'Follow symlinks during file transfer.' },
+  { file:'connect', path:['Limits','FileTransfer','AllowOverwrite'], type:'boolean', default:true, description:'Allow overwriting existing files.' },
+  { file:'connect', path:['Limits','FileTransfer','RegularFilesOnly'], type:'boolean', default:true, description:'Only allow transferring regular files.' },
+  { file:'connect', path:['Limits','FileTransfer','PreserveOwner'], type:'boolean', default:true, description:'Preserve file owner on upload.' },
+  { file:'connect', path:['Limits','FileTransfer','PreserveGroup'], type:'boolean', default:true, description:'Preserve file group on upload.' },
+  { file:'connect', path:['Limits','FileTransfer','PreserveMode'], type:'boolean', default:true, description:'Preserve file permission mode on upload.' },
+  { file:'connect', path:['Limits','FileTransfer','Umask'], type:'string', format:'octal', default:'',
+    description:'Octal permission mask applied to uploaded files, e.g. "600".' },
+  { file:'connect', path:['Limits','FileTransfer','Counters','MaxBytesTxPerMinute'], type:'integer', default:1048576,
+    description:'Max bytes/minute sent to the device (0 = unlimited).' },
+  { file:'connect', path:['Limits','FileTransfer','Counters','MaxBytesRxPerMinute'], type:'integer', default:1048576,
+    description:'Max bytes/minute received from the device (0 = unlimited).' },
+
+  // legacy keys mender-connect still recognizes but warns on
+  { file:'connect', path:['ServerURL'], type:'any', deprecated:true, description:'Deprecated here — configure in mender.conf instead.' },
+  { file:'connect', path:['Servers'], type:'any', deprecated:true, description:'Deprecated here — configure in mender.conf instead.' },
+  { file:'connect', path:['ClientProtocol'], type:'any', deprecated:true, description:'Deprecated, no longer used.' },
+  { file:'connect', path:['HTTPSClient'], type:'any', deprecated:true, description:'Deprecated here — configure HttpsClient in mender.conf instead.' },
+  { file:'connect', path:['SkipVerify'], type:'any', deprecated:true, description:'Deprecated, no longer used.' },
+  { file:'connect', path:['ServerCertificate'], type:'any', deprecated:true, description:'Deprecated here — configure in mender.conf instead.' },
+];
+
+FIELDS.forEach(f => f.pathStr = f.path.join('.'));
+
+const EXAMPLES = {
+  mender: JSON.stringify({ ServerURL: 'https://hosted.mender.io' }, null, 2) + '\n',
+  connect: '{\n}\n',
+};
+
+// ---- path / type helpers ------------------------------------------------
+function getPath(obj, path) {
+  let cur = obj;
+  for (const k of path) {
+    if (cur === null || typeof cur !== 'object' || !(k in cur)) return undefined;
+    cur = cur[k];
+  }
+  return cur;
+}
+function setPath(obj, path, value) {
+  let cur = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    const k = path[i];
+    if (typeof cur[k] !== 'object' || cur[k] === null || Array.isArray(cur[k])) cur[k] = {};
+    cur = cur[k];
+  }
+  cur[path[path.length - 1]] = value;
+}
+function isAbsolutePath(v) { return typeof v === 'string' && v.startsWith('/') && v.length > 1; }
+function isPkcs11(v) { return typeof v === 'string' && v.startsWith('pkcs11:'); }
+function isUrl(v) {
+  if (typeof v !== 'string' || !/^https?:\/\//.test(v)) return false;
+  try { new URL(v); return true; } catch { return false; }
+}
+function isOctal(v) { return typeof v === 'string' && /^[0-7]{3,4}$/.test(v); }
+
+function defaultForType(f) {
+  if (f.default !== undefined) return JSON.parse(JSON.stringify(f.default));
+  switch (f.type) {
+    case 'string': return '';
+    case 'integer': return 0;
+    case 'boolean': return false;
+    case 'string[]': return [];
+    case 'serverArray': return [{ ServerURL: '' }];
+    default: return '';
+  }
+}
+
+// container path prefixes derived from schema, used to walk unknown keys
+function containerPrefixesFor(file) {
+  const set = new Set();
+  FIELDS.filter(f => f.file === file).forEach(f => {
+    for (let i = 1; i < f.path.length; i++) set.add(f.path.slice(0, i).join('.'));
+  });
+  return set;
+}
+
+function validateField(f, value, errors, warnings) {
+  const p = f.pathStr;
+  if (f.deprecated) warnings.push({ path: p, message: 'Deprecated key — may be ignored or unsupported.' });
+  if (f.type === 'any') return;
+
+  if (f.type === 'string') {
+    if (typeof value !== 'string') { errors.push({ path: p, message: 'expected a string' }); return; }
+    if (f.format === 'url' && !isUrl(value)) errors.push({ path: p, message: 'expected an http(s):// URL' });
+    if (f.format === 'path' && !isAbsolutePath(value)) errors.push({ path: p, message: 'expected an absolute filesystem path (starting with "/")' });
+    if (f.format === 'device-path') {
+      if (!isAbsolutePath(value)) errors.push({ path: p, message: 'expected an absolute device path' });
+      else if (!value.startsWith('/dev/')) warnings.push({ path: p, message: 'path does not start with /dev/ — verify this is a block device' });
+    }
+    if (f.format === 'path-or-pkcs11' && !isAbsolutePath(value) && !isPkcs11(value)) {
+      errors.push({ path: p, message: 'expected an absolute path or a PKCS#11 URI ("pkcs11:...")' });
+    }
+    if (f.format === 'enum' && !f.enum.includes(value)) {
+      errors.push({ path: p, message: `expected one of: ${f.enum.join(', ')}` });
+    }
+    if (f.format === 'octal' && value !== '' && !isOctal(value)) {
+      errors.push({ path: p, message: 'expected an octal permission string, e.g. "600"' });
+    }
+    return;
+  }
+  if (f.type === 'integer') {
+    if (!Number.isInteger(value)) { errors.push({ path: p, message: 'expected an integer' }); return; }
+    if (value < 0) errors.push({ path: p, message: 'expected a non-negative integer' });
+    if (f.format === 'range' && (value < f.min || value > f.max)) {
+      errors.push({ path: p, message: `expected a value between ${f.min} and ${f.max}` });
+    }
+    return;
+  }
+  if (f.type === 'boolean') {
+    if (typeof value !== 'boolean') errors.push({ path: p, message: 'expected true or false' });
+    return;
+  }
+  if (f.type === 'string[]') {
+    if (!Array.isArray(value)) { errors.push({ path: p, message: 'expected an array of strings' }); return; }
+    value.forEach((item, i) => {
+      if (typeof item !== 'string') errors.push({ path: `${p}[${i}]`, message: 'expected a string' });
+    });
+    return;
+  }
+  if (f.type === 'serverArray') {
+    if (!Array.isArray(value)) { errors.push({ path: p, message: 'expected an array of {"ServerURL": "..."} objects' }); return; }
+    if (value.length === 0) warnings.push({ path: p, message: 'array is empty' });
+    value.forEach((item, i) => {
+      if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+        errors.push({ path: `${p}[${i}]`, message: 'expected an object with a ServerURL key' });
+      } else if (typeof item.ServerURL !== 'string' || !isUrl(item.ServerURL)) {
+        errors.push({ path: `${p}[${i}].ServerURL`, message: 'expected an http(s):// URL' });
+      }
+    });
+  }
+}
+
+function validate(text, file) {
+  const result = { isValidJson: true, isValid: true, parseError: '', errors: [], warnings: [], missingWithDefault: [] };
+  let parsed;
+  try {
+    parsed = text.trim() === '' ? {} : JSON.parse(text);
+  } catch (e) {
+    result.isValidJson = false;
+    result.isValid = false;
+    result.parseError = e.message;
+    return result;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    result.isValidJson = false;
+    result.isValid = false;
+    result.parseError = 'Root of the config file must be a JSON object ({ ... }).';
+    return result;
+  }
+
+  const fields = FIELDS.filter(f => f.file === file);
+  const errors = [], warnings = [], missingWithDefault = [];
+
+  fields.forEach(f => {
+    const value = getPath(parsed, f.path);
+    if (value !== undefined) {
+      validateField(f, value, errors, warnings);
+    } else if (f.default !== undefined) {
+      missingWithDefault.push(f);
+    }
+  });
+
+  // mandatory group: at least one required, and mutually exclusive
+  const groups = {};
+  fields.forEach(f => {
+    if (f.mandatoryGroup) (groups[f.mandatoryGroup] ??= []).push(f);
+  });
+  Object.values(groups).forEach(members => {
+    const present = members.filter(f => getPath(parsed, f.path) !== undefined);
+    if (present.length === 0) {
+      errors.push({ path: members.map(f => f.pathStr).join(' / '), message: 'one of these is required' });
+    } else if (present.length > 1) {
+      errors.push({ path: present.map(f => f.pathStr).join(' / '), message: 'these are mutually exclusive — set only one' });
+    }
+  });
+
+  // exclusive-only groups (not mandatory)
+  const exGroups = {};
+  fields.forEach(f => {
+    if (f.exclusiveGroup) (exGroups[f.exclusiveGroup] ??= []).push(f);
+  });
+  Object.values(exGroups).forEach(members => {
+    const present = members.filter(f => getPath(parsed, f.path) !== undefined);
+    if (present.length > 1) {
+      errors.push({ path: present.map(f => f.pathStr).join(' / '), message: 'these are mutually exclusive — set only one' });
+    }
+  });
+
+  // unknown keys
+  const known = new Set(fields.map(f => f.pathStr));
+  const containers = containerPrefixesFor(file);
+  (function walk(obj, prefix) {
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return;
+    Object.keys(obj).forEach(key => {
+      const full = prefix.concat(key);
+      const fullStr = full.join('.');
+      if (known.has(fullStr)) return; // validated above
+      if (containers.has(fullStr)) { walk(obj[key], full); return; }
+      warnings.push({ path: fullStr, message: 'unrecognized key' });
+    });
+  })(parsed, []);
+
+  result.errors = errors;
+  result.warnings = warnings;
+  result.missingWithDefault = missingWithDefault;
+  result.isValid = errors.length === 0;
+  return result;
+}
+
+// ---- app -----------------------------------------------------------------
+createApp({
+  data() {
+    return {
+      activeFile: 'mender',
+      texts: { mender: EXAMPLES.mender, connect: EXAMPLES.connect },
+      browseSearch: '',
+    };
+  },
+  computed: {
+    currentText: {
+      get() { return this.texts[this.activeFile]; },
+      set(v) { this.texts[this.activeFile] = v; },
+    },
+    validation() {
+      return validate(this.texts[this.activeFile], this.activeFile);
+    },
+    parsedCurrent() {
+      try { return this.currentText.trim() === '' ? {} : JSON.parse(this.currentText); }
+      catch { return null; }
+    },
+    filteredFields() {
+      const q = this.browseSearch.trim().toLowerCase();
+      return FIELDS.filter(f => f.file === this.activeFile)
+        .filter(f => !q || f.pathStr.toLowerCase().includes(q) || f.description.toLowerCase().includes(q));
+    },
+  },
+  methods: {
+    isPresent(f) {
+      const obj = this.parsedCurrent;
+      return obj !== null && getPath(obj, f.path) !== undefined;
+    },
+    formatDefault(f) {
+      return typeof f.default === 'string' ? `"${f.default}"` : JSON.stringify(f.default);
+    },
+    insertField(f) {
+      const obj = this.parsedCurrent === null ? {} : this.parsedCurrent;
+      setPath(obj, f.path, defaultForType(f));
+      this.texts[this.activeFile] = JSON.stringify(obj, null, 2) + '\n';
+    },
+    resetCurrent() {
+      this.texts[this.activeFile] = EXAMPLES[this.activeFile];
+    },
+    download() {
+      const name = this.activeFile === 'mender' ? 'mender.conf' : 'mender-connect.conf';
+      const blob = new Blob([this.currentText], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+    onUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = reader.result;
+        const name = file.name.toLowerCase();
+        const looksLikeConnect = name.includes('connect') || /"ShellCommand"|"Terminal"|"Sessions"|"FileTransfer"|"ReconnectIntervalSeconds"/.test(content);
+        this.activeFile = looksLikeConnect ? 'connect' : 'mender';
+        this.texts[this.activeFile] = content;
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    },
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
