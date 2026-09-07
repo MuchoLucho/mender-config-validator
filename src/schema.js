@@ -145,14 +145,20 @@ export const FIELDS = [
 
 FIELDS.forEach(f => { f.pathStr = f.path.join('.'); });
 
-export const EXAMPLES = {
-  mender: JSON.stringify({
+// `plan` omits TenantToken for Open Source, which has no multi-tenancy.
+export function menderExample(plan) {
+  const obj = {
     InventoryPollIntervalSeconds: 28800,
     RetryPollIntervalSeconds: 300,
     ServerURL: 'https://hosted.mender.io/',
-    TenantToken: 'Paste your Mender Professional token here',
+    TenantToken: 'Paste your Mender token here',
     UpdatePollIntervalSeconds: 1800,
-  }, null, 2) + '\n',
+  };
+  if (plan === 'opensource') delete obj.TenantToken;
+  return JSON.stringify(obj, null, 2) + '\n';
+}
+
+export const EXAMPLES = {
   connect: '{\n}\n',
 };
 

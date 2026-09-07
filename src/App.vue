@@ -7,12 +7,25 @@ import ThemeToggle from './components/ThemeToggle.vue';
 import ConfigEditor from './components/ConfigEditor.vue';
 import DiagnosticsPanel from './components/DiagnosticsPanel.vue';
 import KeyBrowser from './components/KeyBrowser.vue';
-import { fieldsFor, EXAMPLES } from './schema.js';
+import { fieldsFor, EXAMPLES, menderExample } from './schema.js';
 import { validateText, setPath, removePath, defaultForType } from './validate.js';
 
 const activeFile = ref('mender');
 const plan = ref('hosted');
-const texts = reactive({ mender: EXAMPLES.mender, connect: EXAMPLES.connect });
+const texts = reactive({ mender: menderExample(plan.value), connect: EXAMPLES.connect });
+
+// TenantToken doesn't exist for Open Source (no multi-tenancy) — strip it
+// from whatever's currently in the mender.conf editor the moment that
+// plan is selected, rather than just leaving it to show as an error.
+watch(plan, (newPlan) => {
+  if (newPlan !== 'opensource') return;
+  let obj;
+  try { obj = JSON.parse(texts.mender); } catch { return; }
+  if (obj && typeof obj === 'object' && 'TenantToken' in obj) {
+    delete obj.TenantToken;
+    texts.mender = JSON.stringify(obj, null, 2) + '\n';
+  }
+});
 
 // index.html's inline script already set data-theme before first paint
 // (avoids a flash of the wrong theme) — read it back rather than
@@ -62,7 +75,7 @@ function applyFix(row, action) {
 }
 
 function resetCurrent() {
-  texts[activeFile.value] = EXAMPLES[activeFile.value];
+  texts[activeFile.value] = activeFile.value === 'mender' ? menderExample(plan.value) : EXAMPLES.connect;
 }
 
 function download() {
