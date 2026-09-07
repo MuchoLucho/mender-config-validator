@@ -23,6 +23,29 @@ export function setPath(obj, path, value) {
   cur[path[path.length - 1]] = value;
 }
 
+// Deletes whatever is at `path` (object key or array index), for the
+// "remove" fix-it action. No-op if the path doesn't resolve.
+export function removePath(obj, path) {
+  let cur = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (cur == null || typeof cur !== 'object') return;
+    cur = cur[path[i]];
+  }
+  if (cur == null || typeof cur !== 'object') return;
+  const last = path[path.length - 1];
+  if (Array.isArray(cur) && typeof last === 'number') cur.splice(last, 1);
+  else delete cur[last];
+}
+
+// A field is safe to "reset to default" only when the placeholder/default
+// value is guaranteed to itself pass validation — i.e. it has an explicit
+// schema default, or it's a primitive with no extra format constraint
+// (serverArray's placeholder nests an empty ServerURL, which would just
+// trade one error for another, so it's excluded).
+function canResetField(f) {
+  return f.default !== undefined || (f.type !== 'serverArray' && f.type !== 'any' && !f.format);
+}
+
 export function defaultForType(f) {
   if (f.default !== undefined) return JSON.parse(JSON.stringify(f.default));
   switch (f.type) {
@@ -111,7 +134,7 @@ function checkPkcs11(v) {
 // ---- field validation --------------------------------------------------
 
 function validateField(f, value, segs, push) {
-  if (f.deprecated) push('warning', segs, 'deprecated key — may be ignored or unsupported by current clients');
+  if (f.deprecated) push('warning', segs, 'deprecated key — may be ignored or unsupported by current clients', null, { noReset: true });
   if (f.type === 'any') return;
 
   if (f.type === 'string') {
@@ -189,7 +212,7 @@ function parseErrorPosition(text, message) {
 export function validateText(text, file, plan = 'hosted') {
   const result = {
     isValidJson: true, isValid: true, parseError: null, parseErrorRange: null,
-    errors: [], warnings: [], missingWithDefault: [],
+    errors: [], warnings: [],
   };
 
   let parsed;
@@ -216,17 +239,13 @@ export function validateText(text, file, plan = 'hosted') {
   const fields = fieldsFor(file);
   const rawErrors = [];
   const rawWarnings = [];
-  const push = (severity, segs, message, hint) => {
-    (severity === 'error' ? rawErrors : rawWarnings).push({ segs, message, hint: hint || null });
+  const push = (severity, segs, message, hint, opts) => {
+    (severity === 'error' ? rawErrors : rawWarnings).push({ segs, message, hint: hint || null, noReset: !!opts?.noReset });
   };
 
   fields.forEach(f => {
     const value = getPath(parsed, f.path);
-    if (value !== undefined) {
-      validateField(f, value, f.path, push);
-    } else if (f.default !== undefined && planApplicable(f, plan)) {
-      result.missingWithDefault.push(f);
-    }
+    if (value !== undefined) validateField(f, value, f.path, push);
   });
 
   // --- plan-specific rules (see plans.js for what's modeled and why) ---
@@ -278,7 +297,7 @@ export function validateText(text, file, plan = 'hosted') {
     if (present.length === 0) {
       push('error', members[0].path, `one of ${members.map(m => m.pathStr).join(' / ')} is required`);
     } else if (present.length > 1) {
-      present.forEach(f => push('error', f.path, `mutually exclusive with ${present.filter(x => x !== f).map(x => x.pathStr).join(', ')} — set only one`));
+      present.forEach(f => push('error', f.path, `mutually exclusive with ${present.filter(x => x !== f).map(x => x.pathStr).join(', ')} — set only one`, null, { noReset: true }));
     }
   });
 
@@ -288,7 +307,7 @@ export function validateText(text, file, plan = 'hosted') {
   Object.values(exGroups).forEach(members => {
     const present = members.filter(f => getPath(parsed, f.path) !== undefined);
     if (present.length > 1) {
-      present.forEach(f => push('error', f.path, `mutually exclusive with ${present.filter(x => x !== f).map(x => x.pathStr).join(', ')} — set only one`));
+      present.forEach(f => push('error', f.path, `mutually exclusive with ${present.filter(x => x !== f).map(x => x.pathStr).join(', ')} — set only one`, null, { noReset: true }));
     }
   });
 
@@ -309,8 +328,9 @@ export function validateText(text, file, plan = 'hosted') {
     });
   })(parsed, []);
 
-  // attach display path + source range
-  const finalize = (list) => list.map(({ segs, message, hint }) => {
+  // attach display path, source range, and available one-click fixes
+  const knownFieldByPath = new Map(fields.map(f => [f.pathStr, f]));
+  const finalize = (list) => list.map(({ segs, message, hint, noReset }) => {
     const path = fmtPath(segs);
     const ptr = toPointer(segs);
     const p = pointers[ptr];
@@ -319,7 +339,15 @@ export function validateText(text, file, plan = 'hosted') {
       if (p.key && p.keyEnd) range = { from: p.key.pos, to: p.keyEnd.pos };
       else if (p.value && p.valueEnd) range = { from: p.value.pos, to: p.valueEnd.pos };
     }
-    return { path, message, hint, range };
+
+    const present = getPath(parsed, segs) !== undefined;
+    const field = segs.every(s => typeof s === 'string') ? knownFieldByPath.get(segs.join('.')) : undefined;
+    const actions = [];
+    if (present) actions.push({ type: 'remove', label: 'remove' });
+    if (field && !present) actions.push({ type: 'insert', label: 'insert default', field });
+    else if (field && present && !noReset && canResetField(field)) actions.push({ type: 'reset', label: 'reset to default', field });
+
+    return { path, message, hint, range, segs, actions };
   });
 
   result.errors = finalize(rawErrors);

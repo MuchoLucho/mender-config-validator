@@ -13,6 +13,10 @@ const filtered = computed(() => {
   if (!q) return props.fields;
   return props.fields.filter(f => f.pathStr.toLowerCase().includes(q) || f.description.toLowerCase().includes(q));
 });
+
+function formatDefault(f) {
+  return typeof f.default === 'string' ? `"${f.default}"` : JSON.stringify(f.default);
+}
 </script>
 
 <template>
@@ -26,6 +30,7 @@ const filtered = computed(() => {
       <span class="badge mandatory" v-if="f.mandatoryGroup">required</span>
       <span class="badge deprecated" v-if="f.deprecated">deprecated</span>
       <span class="badge set" v-if="isPresent(f)">set</span>
+      <span class="default" v-if="f.default !== undefined">default: {{ formatDefault(f) }}</span>
       <div class="desc">{{ f.description }}</div>
     </div>
   </div>
@@ -41,6 +46,7 @@ const filtered = computed(() => {
 .row:last-child { border-bottom: none; }
 .row .path { color: var(--accent); font-family: var(--font-mono); font-size: 12.5px; }
 .row .type { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.row .default { color: var(--muted); font-size: 11px; margin-left: 8px; }
 .row .desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .row button.insert {
   float: right; background: none; border: 1px solid var(--border); color: var(--muted);

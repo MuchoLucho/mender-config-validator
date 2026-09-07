@@ -5,10 +5,9 @@ import Toolbar from './components/Toolbar.vue';
 import PlanSelector from './components/PlanSelector.vue';
 import ConfigEditor from './components/ConfigEditor.vue';
 import DiagnosticsPanel from './components/DiagnosticsPanel.vue';
-import DefaultsPanel from './components/DefaultsPanel.vue';
 import KeyBrowser from './components/KeyBrowser.vue';
 import { fieldsFor, EXAMPLES } from './schema.js';
-import { validateText, setPath, defaultForType } from './validate.js';
+import { validateText, setPath, removePath, defaultForType } from './validate.js';
 
 const activeFile = ref('mender');
 const plan = ref('hosted');
@@ -42,6 +41,13 @@ function isPresent(f) {
 function insertField(f) {
   const obj = parsedCurrent.value === null ? {} : parsedCurrent.value;
   setPath(obj, f.path, defaultForType(f));
+  texts[activeFile.value] = JSON.stringify(obj, null, 2) + '\n';
+}
+
+function applyFix(row, action) {
+  const obj = parsedCurrent.value === null ? {} : parsedCurrent.value;
+  if (action.type === 'remove') removePath(obj, row.segs);
+  else setPath(obj, action.field.path, defaultForType(action.field));
   texts[activeFile.value] = JSON.stringify(obj, null, 2) + '\n';
 }
 
@@ -98,8 +104,7 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
       :invalid="!validation.isValidJson"
     />
     <div class="side">
-      <DiagnosticsPanel :validation="validation" />
-      <DefaultsPanel :fields="validation.missingWithDefault" @insert="insertField" />
+      <DiagnosticsPanel :validation="validation" @fix="applyFix" />
       <KeyBrowser :fields="activeFields" :is-present="isPresent" @insert="insertField" />
     </div>
   </main>

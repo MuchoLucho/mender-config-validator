@@ -76,13 +76,25 @@ ever call it out with its own floor.
 ## Code conventions
 
 - `src/validate.js` is pure (no Vue, no DOM) and returns
-  `{ isValidJson, isValid, parseError, parseErrorRange, errors, warnings,
-  missingWithDefault }`. Each error/warning carries `{ path, message, hint,
-  range }` — `range` is a character offset pair from `json-source-map`,
-  used both by `ConfigEditor.vue` (CodeMirror diagnostic positions) and
-  displayed as plain text elsewhere. Keep it side-effect-free so it can be
+  `{ isValidJson, isValid, parseError, parseErrorRange, errors, warnings }`.
+  Each error/warning carries `{ path, message, hint, range, segs, actions }`:
+  `range` is a character offset pair from `json-source-map` (used by
+  `ConfigEditor.vue` for CodeMirror diagnostic positions); `segs` is the raw
+  path array (strings and/or array indices); `actions` is computed in
+  `finalize()` and is an array of zero or more of `{type:'insert', field}`,
+  `{type:'reset', field}`, `{type:'remove'}` — whichever fixes are safe for
+  that row (see `canResetField()` for what "safe" means and why
+  `serverArray`/legacy `any` fields and mutual-exclusivity conflicts are
+  excluded from "reset"). `DiagnosticsPanel.vue` just renders whatever
+  `actions` it's given; `App.vue`'s `applyFix()` is the only place that
+  interprets `action.type`. Keep `validate.js` side-effect-free so it can be
   called from both the editor's linter and the side panels without
   duplicating logic.
+- There's deliberately no separate "keys with defaults" panel — `KeyBrowser`
+  shows the default value inline for every field that has one (set or not),
+  and `insertField`/the `insert`-type fix action always insert
+  `defaultForType(f)`, so "insert" and "the default is already filled in"
+  are the same code path, not two.
 - `fieldsFor(file, plan)` in `schema.js`: omit `plan` to get the *full*
   schema for a file (used for structural checks like unknown-key
   detection, so a plan-restricted key like `TenantToken` is still

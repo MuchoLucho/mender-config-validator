@@ -18,10 +18,14 @@ client-side — nothing is uploaded anywhere.
 - **Deployment-type aware**: a "Hosted Mender / On-Prem Enterprise / On-Prem
   Open Source" selector changes which keys apply and which limits are
   enforced (see [Plan-specific behavior](#plan-specific-behavior) below).
-- **Defaults panel**: see every key you haven't set and what value the
-  client will use instead.
-- **Key browser**: searchable list of every recognized key, with
-  description, type, required/deprecated/set status, and a one-click insert.
+- **Key browser**: searchable list of every recognized key — description,
+  type, required/deprecated/set status, and the default value the client
+  uses if you leave it out. One-click insert adds the key with that
+  default already filled in.
+- **One-click fixes on errors/warnings**: depending on the problem, a
+  diagnostic row gets an "insert default" (missing required key), "reset
+  to default" (bad value, but a safe default exists), and/or "remove"
+  button — so most problems are fixable without hand-editing the JSON.
 - Upload an existing config file (auto-detects which one) and download your
   edits back out.
 
@@ -69,9 +73,8 @@ src/
     PlanSelector.vue            Hosted / On-Prem Enterprise / On-Prem Open Source dropdown
     Toolbar.vue                 Upload / download / reset / status
     ConfigEditor.vue            CodeMirror wrapper (JSON + lint extension)
-    DiagnosticsPanel.vue        Errors/warnings list
-    DefaultsPanel.vue           Unset keys with defaults
-    KeyBrowser.vue              Searchable full key list
+    DiagnosticsPanel.vue        Errors/warnings list, each with its fix-it action buttons
+    KeyBrowser.vue              Searchable full key list, showing defaults, with insert
 ```
 
 ## Keeping this up to date
