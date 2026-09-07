@@ -104,3 +104,70 @@ ever call it out with its own floor.
   arbitrary prop changes — `ConfigEditor.vue` watches the `plan` prop and
   calls `forceLinting(view)` manually when it changes, since switching
   plans can change diagnostics without touching the text.
+
+## Theming (light/dark, Material look)
+
+- `index.html` has an inline (non-module) script that sets
+  `document.documentElement.dataset.theme` from `localStorage` or
+  `prefers-color-scheme` *before* Vue mounts — this has to stay a plain
+  synchronous `<script>` in the HTML, not something in `main.js`/`App.vue`,
+  or there's a flash of the wrong theme on load. `App.vue` reads that
+  attribute as its initial state and is the only place that writes it back
+  (plus `localStorage`) afterwards, in a `watch`.
+- All colors live in `src/style.css` as CSS custom properties scoped under
+  `:root[data-theme='dark']` / `:root[data-theme='light']`. Never hardcode
+  a color in a component — add/reuse a variable instead, or the light/dark
+  toggle silently breaks for that element. `ConfigEditor.vue`'s CodeMirror
+  theme is the one place colors are set from JS instead of CSS — it's
+  rebuilt as a `computed` keyed on the `dark` prop specifically so
+  CodeMirror's own base theme (selection, defaults) switches too, not just
+  our custom rules; `vue-codemirror` watches the `extensions` prop and
+  reconfigures the live editor, so this "just works" when the prop flips.
+- **`--accent` vs `--accent-ink`**: `--accent` is the raw Northern.tech
+  brand blue `#28AEE4` (confirmed from the fill color in the logo SVG at
+  northern.tech — don't reuse a different blue without checking there
+  first). Its contrast against a white surface is only ~2.5:1, well under
+  the ~4.5:1 needed for body text, so it's fine for borders/focus
+  rings/filled chip backgrounds but **not** for text. `--accent-ink` is a
+  darkened tone (`#157fad` in light mode) used for anything textual —
+  field paths, links, active-tab labels. In dark mode `--accent-ink` is
+  just `--accent` again, since the raw blue already has ~7.6:1 contrast
+  against the dark background. If you add a new use of the accent color,
+  check whether it's text (`--accent-ink`) or decoration (`--accent`)
+  before picking one.
+- `--*-soft` background tints (`--accent-soft`, `--ok-soft`, `--warn-soft`,
+  `--err-soft`) are computed once via `color-mix(in srgb, var(--X) 12-14%,
+  var(--surface))` in the theme-agnostic part of `style.css` — they don't
+  need their own per-theme values, since they resolve against whatever
+  `--surface`/`--ok`/etc. are active. Follow this pattern for any new
+  tinted-background color rather than hand-picking an rgba per theme.
+- Global reusable classes (`.btn` — pill-shaped tonal button for the
+  toolbar; `.chip` — smaller tonal button for inline insert/reset/remove
+  actions; `.badge`, `.panel`) live in `style.css`, not per-component
+  `<style scoped>` blocks, specifically so every button/badge/panel stays
+  visually consistent without copy-pasted CSS. Reuse these before adding a
+  new component-local button style.
+
+## Responsive layout gotchas
+
+- Tested down to a 390px-wide viewport. The recurring trap is CSS Grid's
+  and Flexbox's default `min-width: auto` on children/items: an
+  unbreakable long child (a long CodeMirror JSON line, a long field name
+  like `UpdateControlMapBootExpirationTimeSeconds` next to its insert
+  button) will force its container — and via that, the whole page — wider
+  than the viewport, even though everything *looks* fine in a quick visual
+  check. `main > * { min-width: 0; }` in `App.vue` and `min-width: 0` on
+  `.editor-shell` in `ConfigEditor.vue` exist specifically to defeat this.
+  If you add a new grid/flex layout and mobile testing shows horizontal
+  scroll, check `min-width: auto` first — don't just add `overflow-x:
+  hidden` and call it fixed, since that clips content instead of
+  reflowing it.
+- `KeyBrowser.vue` and `DiagnosticsPanel.vue` both use a `.row-head` flex
+  row with `flex-wrap: wrap` so the insert/fix button drops to its own
+  line when the path/message next to it is too long to share a row —
+  don't remove that wrap, and don't go back to `float: right` for these
+  buttons (it doesn't reflow sanely at narrow widths).
+- Verify responsive/mobile changes with an actual narrow-viewport
+  screenshot (Playwright at e.g. 390×844) and a
+  `document.documentElement.scrollWidth > clientWidth` check — a
+  desktop-only screenshot won't show this class of bug.

@@ -25,14 +25,15 @@ function onFileChange(e) {
 </template>
 
 <style scoped>
+/* .btn itself comes from the global tonal-button style in style.css */
 .toolbar { display: flex; gap: 10px; padding: 14px 24px; align-items: center; flex-wrap: wrap; }
-.btn {
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
-  padding: 7px 14px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center;
-}
-.btn:hover { border-color: var(--accent); }
 .btn input[type=file] { display: none; }
-.status { margin-left: auto; font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
+.status { margin-left: auto; font-size: 12.5px; font-weight: 600; padding: 6px 14px; border-radius: 999px; }
 .status.ok { background: var(--ok-soft); color: var(--ok); }
 .status.bad { background: var(--err-soft); color: var(--err); }
+
+@media (max-width: 860px) {
+  .toolbar { padding: 12px 16px; }
+  .status { margin-left: 0; order: -1; flex-basis: 100%; }
+}
 </style>

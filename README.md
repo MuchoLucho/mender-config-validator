@@ -28,6 +28,10 @@ client-side — nothing is uploaded anywhere.
   button — so most problems are fixable without hand-editing the JSON.
 - Upload an existing config file (auto-detects which one) and download your
   edits back out.
+- **Material-inspired UI**, responsive down to phone widths, with a
+  light/dark toggle (persisted, defaults to the OS preference). Accent
+  color is Northern.tech's brand blue (`#28AEE4`, taken directly from
+  their logo SVG).
 
 ## Getting started
 
@@ -63,19 +67,45 @@ client config file and were left out.
 index.html                    Vite entry point
 src/
   main.js                     App bootstrap
-  App.vue                     Top-level layout & state (active file, plan, text buffers)
+  App.vue                     Top-level layout & state (active file, plan, theme, text buffers)
   schema.js                   FIELDS: the full mender.conf / mender-connect.conf key schema
   plans.js                    Deployment types + the Hosted-only limits that key off them
   validate.js                 Pure validation logic (JSON parse, type/format checks, plan rules)
-  style.css                   Shared theme (CSS variables)
+  style.css                   Material-inspired theme tokens (light/dark CSS variables)
   components/
     FileTabs.vue               mender.conf / mender-connect.conf switcher
     PlanSelector.vue            Hosted / On-Prem Enterprise / On-Prem Open Source dropdown
+    ThemeToggle.vue              Light/dark switch
     Toolbar.vue                 Upload / download / reset / status
     ConfigEditor.vue            CodeMirror wrapper (JSON + lint extension)
     DiagnosticsPanel.vue        Errors/warnings list, each with its fix-it action buttons
     KeyBrowser.vue              Searchable full key list, showing defaults, with insert
 ```
+
+## Theming
+
+Light/dark is a `data-theme` attribute on `<html>`, set by an inline
+script in `index.html` *before* Vue mounts (reads `localStorage`, falls
+back to `prefers-color-scheme`) so there's no flash of the wrong theme.
+`ThemeToggle.vue` flips it and persists the choice; `App.vue` is the only
+place that writes `data-theme`/`localStorage` afterwards. All colors are
+CSS custom properties in `style.css`, scoped per-theme under
+`:root[data-theme='dark']` / `:root[data-theme='light']` — components
+never hardcode a color.
+
+Two accent variables matter: `--accent` is the raw brand blue
+(`#28AEE4`) for non-text uses (borders, focus rings, filled chips/badges);
+`--accent-ink` is a darkened variant used wherever the accent is *text*
+color, since the raw brand blue doesn't have enough contrast against a
+white surface (see CLAUDE.md for the contrast math). Don't use `--accent`
+for text — use `--accent-ink`.
+
+The app is responsive down to phone widths (tested at 390px). If you add
+a new panel/row layout, avoid `float`-based button placement (wrap
+poorly) and watch out for CSS Grid/Flexbox's default `min-width: auto`,
+which lets an unbreakable child (e.g. a long CodeMirror line or a long
+field name) blow out the layout on narrow screens — see the `min-width:
+0` comments in `App.vue` and `ConfigEditor.vue` if you hit this again.
 
 ## Keeping this up to date
 

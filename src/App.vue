@@ -1,8 +1,9 @@
 <script setup>
-import { reactive, ref, computed } from 'vue';
+import { reactive, ref, computed, watch } from 'vue';
 import FileTabs from './components/FileTabs.vue';
 import Toolbar from './components/Toolbar.vue';
 import PlanSelector from './components/PlanSelector.vue';
+import ThemeToggle from './components/ThemeToggle.vue';
 import ConfigEditor from './components/ConfigEditor.vue';
 import DiagnosticsPanel from './components/DiagnosticsPanel.vue';
 import KeyBrowser from './components/KeyBrowser.vue';
@@ -12,6 +13,15 @@ import { validateText, setPath, removePath, defaultForType } from './validate.js
 const activeFile = ref('mender');
 const plan = ref('hosted');
 const texts = reactive({ mender: EXAMPLES.mender, connect: EXAMPLES.connect });
+
+// index.html's inline script already set data-theme before first paint
+// (avoids a flash of the wrong theme) — read it back rather than
+// re-deriving from matchMedia so the two stay in lockstep.
+const theme = ref(document.documentElement.getAttribute('data-theme') || 'dark');
+watch(theme, (v) => {
+  document.documentElement.setAttribute('data-theme', v);
+  localStorage.setItem('mcv-theme', v);
+});
 
 const currentText = computed({
   get: () => texts[activeFile.value],
@@ -87,8 +97,11 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
 
 <template>
   <header>
-    <h1>Mender Config Validator</h1>
-    <p>Edit, validate and download <code>mender.conf</code> / <code>mender-connect.conf</code></p>
+    <div class="titles">
+      <h1>Mender Config Validator</h1>
+      <p>Edit, validate and download <code>mender.conf</code> / <code>mender-connect.conf</code></p>
+    </div>
+    <ThemeToggle v-model="theme" />
   </header>
 
   <FileTabs :active-file="activeFile" @change="activeFile = $event" />
@@ -101,6 +114,7 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
       v-model="currentText"
       :file="activeFile"
       :plan="plan"
+      :dark="theme === 'dark'"
       :invalid="!validation.isValidJson"
     />
     <div class="side">
@@ -111,14 +125,28 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
 </template>
 
 <style scoped>
-header { padding: 20px 24px 16px; display: flex; align-items: baseline; gap: 12px; }
+header {
+  padding: 20px 24px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+header .titles { min-width: 0; }
 header h1 { font-size: 19px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
-header p { margin: 0; color: var(--muted); font-size: 13px; }
-header code { color: var(--accent); font-family: var(--font-mono); }
+header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+header code { color: var(--accent-ink); font-family: var(--font-mono); }
 
 main {
   display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
   padding: 0 24px 24px; align-items: start; flex: 1;
 }
+/* grid items default to min-width:auto, which lets a long unbreakable
+   CodeMirror line (or any child) force the column — and the whole
+   page — wider than the viewport. Constrain both columns explicitly. */
+main > * { min-width: 0; }
 .side { max-height: 70vh; overflow-y: auto; padding-right: 2px; }
+
+@media (max-width: 860px) {
+  header { padding: 16px 16px 12px; }
+  header p { display: none; }
+  main { grid-template-columns: 1fr; padding: 0 16px 20px; gap: 14px; }
+  .side { max-height: none; overflow: visible; padding-right: 0; }
+}
 </style>

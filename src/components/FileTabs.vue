@@ -17,16 +17,25 @@ const emit = defineEmits(['change']);
 </template>
 
 <style scoped>
-.tabs { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.tabs {
+  display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--border);
+  background: var(--surface); overflow-x: auto;
+}
 .tabs button {
   background: none; border: none; color: var(--muted); padding: 12px 18px; font-size: 13.5px;
-  font-weight: 500; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+  font-weight: 500; border-bottom: 3px solid transparent; transition: color .15s, border-color .15s;
+  white-space: nowrap; flex: none;
 }
 .tabs button:hover { color: var(--text); }
-.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+.tabs button.active { color: var(--accent-ink); border-bottom-color: var(--accent); }
 .file-note {
-  padding: 8px 24px; font-size: 12px; color: var(--muted); background: var(--panel);
+  padding: 8px 24px; font-size: 12px; color: var(--muted); background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
-.file-note code { color: var(--accent); font-family: var(--font-mono); }
+.file-note code { color: var(--accent-ink); font-family: var(--font-mono); }
+
+@media (max-width: 860px) {
+  .tabs { padding: 0 16px; }
+  .file-note { padding: 8px 16px; }
+}
 </style>

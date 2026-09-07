@@ -11,6 +11,7 @@ const props = defineProps({
   modelValue: { type: String, required: true },
   file: { type: String, required: true },
   plan: { type: String, required: true },
+  dark: { type: Boolean, default: true },
   invalid: { type: Boolean, default: false },
 });
 const emit = defineEmits(['update:modelValue']);
@@ -42,7 +43,7 @@ function toDiagnostic(entry, severity, docLen) {
       wrap.appendChild(main);
       if (entry.hint) {
         const hint = document.createElement('div');
-        hint.style.cssText = 'color:#8a93a6;margin-top:4px;font-size:12px;line-height:1.4;';
+        hint.style.cssText = 'color:var(--muted);margin-top:4px;font-size:12px;line-height:1.4;';
         hint.textContent = entry.hint;
         wrap.appendChild(hint);
       }
@@ -68,24 +69,30 @@ function lintSource(view) {
   ];
 }
 
-const editorTheme = EditorView.theme({
-  '&': { fontSize: '13px', backgroundColor: 'var(--panel)', height: '70vh' },
+// height comes from .editor-shell's CSS (responsive) rather than being
+// baked in here, so the editor just fills its container
+const themeStyle = {
+  '&': { fontSize: '13px', backgroundColor: 'var(--surface)', height: '100%' },
   '.cm-content': { fontFamily: 'var(--font-mono)', padding: '12px 0', caretColor: 'var(--accent)' },
-  '.cm-gutters': { backgroundColor: 'var(--panel)', color: 'var(--muted)', border: 'none' },
-  '.cm-activeLine': { backgroundColor: 'rgba(255,255,255,0.03)' },
-  '.cm-activeLineGutter': { backgroundColor: 'rgba(255,255,255,0.03)' },
+  '.cm-gutters': { backgroundColor: 'var(--surface)', color: 'var(--muted)', border: 'none' },
+  // a text-color tint reads correctly as a highlight in both themes
+  '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--text) 6%, transparent)' },
+  '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--text) 6%, transparent)' },
   '&.cm-focused': { outline: 'none' },
   '.cm-lintRange-error': { backgroundImage: 'none', borderBottom: '2px solid var(--err)' },
   '.cm-lintRange-warning': { backgroundImage: 'none', borderBottom: '2px solid var(--warn)' },
-}, { dark: true });
+};
 
-const extensions = [
+// Rebuilt whenever `dark` flips so CodeMirror's own base theme (selection,
+// default syntax colors, etc.) switches along with our custom rules —
+// vue-codemirror watches `extensions` and reconfigures the live editor.
+const extensions = computed(() => [
   basicSetup,
   json(),
   linter(lintSource, { delay: 250 }),
   lintGutter(),
-  editorTheme,
-];
+  EditorView.theme(themeStyle, { dark: props.dark }),
+]);
 </script>
 
 <template>
@@ -100,6 +107,12 @@ const extensions = [
   border-radius: var(--radius);
   overflow: hidden;
   transition: border-color .15s;
+  height: 70vh;
+  min-width: 0;
 }
 .editor-shell.invalid { border-color: var(--err); }
+
+@media (max-width: 860px) {
+  .editor-shell { height: 46vh; min-height: 280px; }
+}
 </style>
