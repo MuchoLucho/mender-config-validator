@@ -13,8 +13,8 @@ export const FIELDS = [
     description: 'List of {"ServerURL": "..."} objects, alternative to ServerURL for failover.' },
   { file: 'mender', path: ['ServerCertificate'], type: 'string', format: 'path',
     description: 'Absolute path to a trusted server certificate (PEM) used to verify the server.' },
-  { file: 'mender', path: ['TenantToken'], type: 'string',
-    description: 'Mender Enterprise/Hosted tenant token, required for hosted Mender.' },
+  { file: 'mender', path: ['TenantToken'], type: 'string', plans: ['hosted', 'enterprise'],
+    description: 'Multi-tenancy auth token. Required for Hosted Mender; not applicable to Open Source (no multi-tenancy).' },
 
   { file: 'mender', path: ['UpdatePollIntervalSeconds'], type: 'integer', default: 1800,
     description: 'How often the client checks for a new deployment.' },
@@ -150,6 +150,9 @@ export const EXAMPLES = {
   connect: '{\n}\n',
 };
 
-export function fieldsFor(file) {
-  return FIELDS.filter(f => f.file === file);
+// `plan` narrows the result to fields applicable to that deployment type
+// (see plans.js). Omit it to get the full schema for the file, regardless
+// of plan — used for structural checks like unknown-key detection.
+export function fieldsFor(file, plan) {
+  return FIELDS.filter(f => f.file === file && (!plan || !f.plans || f.plans.includes(plan)));
 }

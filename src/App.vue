@@ -2,6 +2,7 @@
 import { reactive, ref, computed } from 'vue';
 import FileTabs from './components/FileTabs.vue';
 import Toolbar from './components/Toolbar.vue';
+import PlanSelector from './components/PlanSelector.vue';
 import ConfigEditor from './components/ConfigEditor.vue';
 import DiagnosticsPanel from './components/DiagnosticsPanel.vue';
 import DefaultsPanel from './components/DefaultsPanel.vue';
@@ -10,6 +11,7 @@ import { fieldsFor, EXAMPLES } from './schema.js';
 import { validateText, setPath, defaultForType } from './validate.js';
 
 const activeFile = ref('mender');
+const plan = ref('hosted');
 const texts = reactive({ mender: EXAMPLES.mender, connect: EXAMPLES.connect });
 
 const currentText = computed({
@@ -17,8 +19,8 @@ const currentText = computed({
   set: (v) => { texts[activeFile.value] = v; },
 });
 
-const validation = computed(() => validateText(texts[activeFile.value], activeFile.value));
-const activeFields = computed(() => fieldsFor(activeFile.value));
+const validation = computed(() => validateText(texts[activeFile.value], activeFile.value, plan.value));
+const activeFields = computed(() => fieldsFor(activeFile.value, plan.value));
 
 const parsedCurrent = computed(() => {
   try { return currentText.value.trim() === '' ? {} : JSON.parse(currentText.value); }
@@ -84,6 +86,7 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
   </header>
 
   <FileTabs :active-file="activeFile" @change="activeFile = $event" />
+  <PlanSelector v-model="plan" />
   <Toolbar :file-name="fileName" :status="status" @upload="onUpload" @download="download" @reset="resetCurrent" />
 
   <main>
@@ -91,6 +94,7 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
       :key="activeFile"
       v-model="currentText"
       :file="activeFile"
+      :plan="plan"
       :invalid="!validation.isValidJson"
     />
     <div class="side">

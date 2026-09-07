@@ -1,5 +1,6 @@
 import jsonMap from 'json-source-map';
 import { fieldsFor } from './schema.js';
+import { planApplicable, HOSTED_POLLING_FLOORS } from './plans.js';
 
 // ---- generic helpers -------------------------------------------------
 
@@ -185,7 +186,7 @@ function parseErrorPosition(text, message) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-export function validateText(text, file) {
+export function validateText(text, file, plan = 'hosted') {
   const result = {
     isValidJson: true, isValid: true, parseError: null, parseErrorRange: null,
     errors: [], warnings: [], missingWithDefault: [],
@@ -223,10 +224,51 @@ export function validateText(text, file) {
     const value = getPath(parsed, f.path);
     if (value !== undefined) {
       validateField(f, value, f.path, push);
-    } else if (f.default !== undefined) {
+    } else if (f.default !== undefined && planApplicable(f, plan)) {
       result.missingWithDefault.push(f);
     }
   });
+
+  // --- plan-specific rules (see plans.js for what's modeled and why) ---
+  const tenantField = fields.find(f => f.pathStr === 'TenantToken');
+  if (tenantField) {
+    const tenantValue = getPath(parsed, tenantField.path);
+    if (!planApplicable(tenantField, plan)) {
+      if (tenantValue !== undefined) {
+        push('warning', tenantField.path, 'not applicable for Mender Open Source',
+          'TenantToken only has meaning for multi-tenant setups (Hosted Mender or an Enterprise on-prem server with multi-tenancy enabled). Remove it, or switch the deployment type above if this server actually is multi-tenant.');
+      }
+    } else if (plan === 'hosted' && tenantValue === undefined) {
+      push('error', tenantField.path, 'required to connect to Hosted Mender',
+        'Find your tenant token in the Hosted Mender UI under Organization settings, or switch the deployment type above if this is actually an on-premises server.');
+    }
+  }
+
+  if (file === 'mender' && plan === 'hosted') {
+    const tier = getPath(parsed, ['Connectivity', 'DeviceTier']) || 'standard';
+    const floor = tier === 'micro' ? HOSTED_POLLING_FLOORS.micro : HOSTED_POLLING_FLOORS.default;
+    const upv = getPath(parsed, ['UpdatePollIntervalSeconds']);
+    if (Number.isInteger(upv) && upv < floor.update) {
+      push('warning', ['UpdatePollIntervalSeconds'],
+        `Hosted Mender rate-limits update polling for "${tier}" devices to a ${floor.update}s minimum`,
+        'Requests sent more often than this are throttled server-side, so a lower value has no real effect against Hosted Mender. This floor is Hosted-specific — on-premises servers (Enterprise or Open Source) can be configured to allow faster polling.');
+    }
+    const inv = getPath(parsed, ['InventoryPollIntervalSeconds']);
+    if (Number.isInteger(inv) && inv < floor.inventory) {
+      push('warning', ['InventoryPollIntervalSeconds'],
+        `Hosted Mender rate-limits inventory updates for "${tier}" devices to a ${floor.inventory}s minimum`,
+        'Requests sent more often than this are throttled server-side, so a lower value has no real effect against Hosted Mender. This floor is Hosted-specific — on-premises servers (Enterprise or Open Source) can be configured to allow faster polling.');
+    }
+    const serverUrl = getPath(parsed, ['ServerURL']);
+    if (typeof serverUrl === 'string' && checkUrl(serverUrl).ok) {
+      try {
+        if (!new URL(serverUrl).hostname.endsWith('mender.io')) {
+          push('warning', ['ServerURL'], 'does not look like a Hosted Mender endpoint',
+            'Hosted Mender typically uses https://hosted.mender.io (or a regional subdomain). If this is actually an on-premises server, switch the deployment type dropdown above instead.');
+        }
+      } catch { /* unreachable: checkUrl(...).ok already guarantees a parseable URL */ }
+    }
+  }
 
   // mandatory groups: at least one required, mutually exclusive
   const groups = {};

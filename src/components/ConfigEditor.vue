@@ -1,18 +1,25 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Codemirror } from 'vue-codemirror';
 import { basicSetup } from 'codemirror';
 import { json } from '@codemirror/lang-json';
-import { linter, lintGutter } from '@codemirror/lint';
+import { linter, lintGutter, forceLinting } from '@codemirror/lint';
 import { EditorView } from '@codemirror/view';
 import { validateText } from '../validate.js';
 
 const props = defineProps({
   modelValue: { type: String, required: true },
   file: { type: String, required: true },
+  plan: { type: String, required: true },
   invalid: { type: Boolean, default: false },
 });
 const emit = defineEmits(['update:modelValue']);
+
+const view = ref(null);
+function onReady(payload) { view.value = payload.view; }
+// The plan dropdown doesn't touch the document, so CodeMirror's linter
+// (which only reruns on doc changes) needs a manual nudge to reflect it.
+watch(() => props.plan, () => { if (view.value) forceLinting(view.value); });
 
 const content = computed({
   get: () => props.modelValue,
@@ -47,7 +54,7 @@ function toDiagnostic(entry, severity, docLen) {
 function lintSource(view) {
   const text = view.state.doc.toString();
   const docLen = view.state.doc.length;
-  const result = validateText(text, props.file);
+  const result = validateText(text, props.file, props.plan);
   if (!result.isValidJson) {
     const r = result.parseErrorRange;
     const clamp = (n) => Math.max(0, Math.min(n, docLen));
@@ -83,7 +90,7 @@ const extensions = [
 
 <template>
   <div class="editor-shell" :class="{ invalid }">
-    <Codemirror v-model="content" :extensions="extensions" :tab-size="2" />
+    <Codemirror v-model="content" :extensions="extensions" :tab-size="2" @ready="onReady" />
   </div>
 </template>
 
