@@ -146,7 +146,13 @@ export const FIELDS = [
 FIELDS.forEach(f => { f.pathStr = f.path.join('.'); });
 
 export const EXAMPLES = {
-  mender: JSON.stringify({ ServerURL: 'https://hosted.mender.io' }, null, 2) + '\n',
+  mender: JSON.stringify({
+    InventoryPollIntervalSeconds: 28800,
+    RetryPollIntervalSeconds: 300,
+    ServerURL: 'https://hosted.mender.io/',
+    TenantToken: 'Paste your Mender Professional token here',
+    UpdatePollIntervalSeconds: 1800,
+  }, null, 2) + '\n',
   connect: '{\n}\n',
 };
 
