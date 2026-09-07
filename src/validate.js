@@ -235,8 +235,8 @@ export function validateText(text, file, plan = 'hosted') {
     const tenantValue = getPath(parsed, tenantField.path);
     if (!planApplicable(tenantField, plan)) {
       if (tenantValue !== undefined) {
-        push('warning', tenantField.path, 'not applicable for Mender Open Source',
-          'TenantToken only has meaning for multi-tenant setups (Hosted Mender or an Enterprise on-prem server with multi-tenancy enabled). Remove it, or switch the deployment type above if this server actually is multi-tenant.');
+        push('error', tenantField.path, 'not valid for Mender Open Source',
+          'TenantToken only has meaning for multi-tenant setups (Hosted Mender or an Enterprise on-prem server with multi-tenancy enabled). Open Source Mender has no multi-tenancy, so this key is rejected — remove it, or switch the deployment type above if this server actually is multi-tenant.');
       }
     } else if (plan === 'hosted' && tenantValue === undefined) {
       push('error', tenantField.path, 'required to connect to Hosted Mender',

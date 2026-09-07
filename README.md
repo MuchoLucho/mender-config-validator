@@ -43,7 +43,7 @@ type you pick from the dropdown:
 
 | | Hosted Mender | On-Prem Enterprise | On-Prem Open Source |
 |---|---|---|---|
-| `TenantToken` | required | optional (multi-tenant setups) | not applicable — flagged if set |
+| `TenantToken` | required | optional (multi-tenant setups) | invalid — error if set |
 | Update/inventory polling floor | enforced (warns if you poll faster) | not enforced | not enforced |
 | `ServerURL` domain sanity check | warns if it doesn't look like `*.mender.io` | not checked | not checked |
 
