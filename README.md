@@ -4,6 +4,8 @@ A browser-based editor and validator for [Mender](https://mender.io) client
 config files: `mender.conf` and `mender-connect.conf`. Runs entirely
 client-side — nothing is uploaded anywhere.
 
+**Live at: https://mucholucho.github.io/mender-config-validator/**
+
 ## Features
 
 - **Live editing** of either config file in a JSON-aware code editor
@@ -43,6 +45,15 @@ npm run build    # produces dist/index.html — a single self-contained file
 
 `dist/index.html` has everything inlined (JS, CSS) and opens directly via
 `file://` — no server needed to use the built app, only to develop it.
+
+## Deployment
+
+`.github/workflows/deploy.yml` builds and publishes `dist/` to GitHub
+Pages on every push to `main` (Pages is configured with source "GitHub
+Actions" — no `gh-pages` branch involved). Since the build's `base` is
+relative (`./`) and everything is inlined into one file anyway, the same
+`dist/index.html` works unchanged whether it's opened from `file://`, a
+project Pages subpath, or a custom domain at the root.
 
 ## Plan-specific behavior
 
