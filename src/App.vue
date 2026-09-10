@@ -117,6 +117,14 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
     <ThemeToggle v-model="theme" />
   </header>
 
+  <div class="privacy-note">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+    Everything runs locally in your browser — nothing you type or paste here, including tokens, is ever sent to a server.
+  </div>
+
   <FileTabs :active-file="activeFile" @change="activeFile = $event" />
   <PlanSelector v-model="plan" />
   <Toolbar :file-name="fileName" :status="status" @upload="onUpload" @download="download" @reset="resetCurrent" />
@@ -146,6 +154,13 @@ header h1 { font-size: 19px; margin: 0; font-weight: 700; letter-spacing: -.01em
 header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 header code { color: var(--accent-ink); font-family: var(--font-mono); }
 
+.privacy-note {
+  display: flex; align-items: center; gap: 8px; padding: 8px 24px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  color: var(--muted); font-size: 12px;
+}
+.privacy-note svg { flex: none; color: var(--accent-ink); }
+
 main {
   display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
   padding: 0 24px 24px; align-items: start; flex: 1;
@@ -159,6 +174,7 @@ main > * { min-width: 0; }
 @media (max-width: 860px) {
   header { padding: 16px 16px 12px; }
   header p { display: none; }
+  .privacy-note { padding: 8px 16px; }
   main { grid-template-columns: 1fr; padding: 0 16px 20px; gap: 14px; }
   .side { max-height: none; overflow: visible; padding-right: 0; }
 }
