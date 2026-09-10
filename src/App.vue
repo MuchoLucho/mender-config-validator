@@ -143,6 +143,12 @@ const fileName = computed(() => activeFile.value === 'mender' ? 'mender.conf' : 
       <KeyBrowser :fields="activeFields" :is-present="isPresent" @insert="insertField" />
     </div>
   </main>
+
+  <footer>
+    Unofficial, community project — not officially supported by Northern.tech or the Mender project.
+    Licensed under <a href="https://github.com/MuchoLucho/mender-config-validator/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a>.
+    Built with <span aria-hidden="true">❤️</span> by <a href="https://github.com/MuchoLucho" target="_blank" rel="noopener">Lucho</a>.
+  </footer>
 </template>
 
 <style scoped>
@@ -171,7 +177,14 @@ main {
 main > * { min-width: 0; }
 .side { max-height: 70vh; overflow-y: auto; padding-right: 2px; }
 
+footer {
+  padding: 16px 24px 24px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6;
+}
+footer a { color: var(--accent-ink); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
 @media (max-width: 860px) {
+  footer { padding: 14px 16px 20px; }
   header { padding: 16px 16px 12px; }
   header p { display: none; }
   .privacy-note { padding: 8px 16px; }
