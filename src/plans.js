@@ -10,7 +10,7 @@
 
 export const PLANS = [
   { id: 'hosted', label: 'Hosted Mender', hint: 'Northern.tech SaaS at hosted.mender.io' },
-  { id: 'enterprise', label: 'On-Prem Enterprise', hint: 'Self-hosted, Enterprise license, multi-tenant capable' },
+  { id: 'enterprise', label: 'On-Prem Enterprise', hint: 'Self-hosted, Enterprise license — requires a tenant token' },
   { id: 'opensource', label: 'On-Prem Open Source', hint: 'Self-hosted, no multi-tenancy' },
 ];
 

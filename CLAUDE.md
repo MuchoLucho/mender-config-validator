@@ -57,7 +57,7 @@ enforced against server/account state that has no corresponding key in
 | Update-check polling interval (micro: 604800s, standard: 1800s) | Yes | `UpdatePollIntervalSeconds`, Hosted-only floor, keyed off `Connectivity.DeviceTier` |
 | Inventory polling interval (micro: 604800s, standard: 28800s) | Yes | `InventoryPollIntervalSeconds`, same mechanism |
 | Max download retries (1–10000, default 10) | Yes | `RetryDownloadCount` — this one's enforced by the client itself, so it applies regardless of plan (not gated by `plans.js`) |
-| TenantToken / multi-tenancy | Yes (indirectly) | Not a numeric limit on that page, but the page's Hosted/on-prem distinction is exactly why `TenantToken` is plan-gated in `schema.js` |
+| TenantToken / multi-tenancy | Yes (indirectly) | Not a numeric limit on that page, but the page's Hosted/on-prem distinction is exactly why `TenantToken` is plan-gated in `schema.js`. Required (error if missing) for both Hosted and On-Prem Enterprise — both are multi-tenant — and rejected (error if set) for Open Source, which has no multi-tenancy at all. |
 | Test device count/changes per day | No | Account-level, no client key |
 | Artifact size (micro 5MiB / standard 10GiB) | No | Deployments-service limit on the Artifact itself, not a client config key |
 | API payload size, single-file upload size | No | Server API limits |

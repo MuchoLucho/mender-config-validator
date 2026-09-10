@@ -260,6 +260,9 @@ export function validateText(text, file, plan = 'hosted') {
     } else if (plan === 'hosted' && tenantValue === undefined) {
       push('error', tenantField.path, 'required to connect to Hosted Mender',
         'Find your tenant token in the Hosted Mender UI under Organization settings, or switch the deployment type above if this is actually an on-premises server.');
+    } else if (plan === 'enterprise' && tenantValue === undefined) {
+      push('error', tenantField.path, 'required for On-Prem Enterprise',
+        'Enterprise on-prem servers are multi-tenant, so devices still need a tenant token — find it in your server\'s Organization settings, or switch the deployment type above if this is actually Open Source (no multi-tenancy).');
     }
   }
 

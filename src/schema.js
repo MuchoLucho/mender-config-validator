@@ -14,7 +14,7 @@ export const FIELDS = [
   { file: 'mender', path: ['ServerCertificate'], type: 'string', format: 'path',
     description: 'Absolute path to a trusted server certificate (PEM) used to verify the server.' },
   { file: 'mender', path: ['TenantToken'], type: 'string', plans: ['hosted', 'enterprise'],
-    description: 'Multi-tenancy auth token. Required for Hosted Mender; not applicable to Open Source (no multi-tenancy).' },
+    description: 'Multi-tenancy auth token. Required for Hosted Mender and On-Prem Enterprise; not applicable to Open Source (no multi-tenancy).' },
 
   { file: 'mender', path: ['UpdatePollIntervalSeconds'], type: 'integer', default: 1800,
     description: 'How often the client checks for a new deployment.' },
